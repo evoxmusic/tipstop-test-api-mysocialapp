@@ -1,159 +1,98 @@
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.github.kittinunf.fuel.Fuel
+import com.github.kittinunf.fuel.core.FuelError
+import com.github.kittinunf.fuel.jackson.jacksonDeserializerOf
+import com.github.kittinunf.result.Result
 import io.mysocialapp.client.MySocialApp
+import io.mysocialapp.client.Session
 import io.mysocialapp.client.models.AccessControl
 import io.mysocialapp.client.models.FeedPost
-import java.util.*
+import io.mysocialapp.client.models.UserSettings
+import kotlinx.coroutines.runBlocking
 
 /**
  * Created by evoxmusic on 27/11/2018.
  */
-fun main() {
-    val dataFromTipsTop: Map<String, Any?> = ObjectMapper().readValue(data,
-        object : TypeReference<HashMap<String, Any?>>() {})
+fun main(vararg args: String) = runBlocking {
+    if (args.size != 3) {
+        throw IllegalArgumentException("3 args required: <mysocialapp_app_id> <tipstop_auth_token> <tipstop_php_session_id>")
+    }
 
-    val session = MySocialApp.Builder()
-        .setAppId("u470584465854a728453")
-        .build()
-        .blockingConnect("alice.jeith@mysocialapp.io", "myverysecretpassw0rd")
+    val (appId, token, phpSessionId) = args
 
-    val feedPost = FeedPost.Builder()
-        .setMessage("This is a magic message")
-        .setPayload(dataFromTipsTop)
-        .setVisibility(AccessControl.PUBLIC)
-        .build()
+    (0..10).forEach { page ->
+        getTipsTopData(token, phpSessionId, page).fold(
+            { data -> sendDataToMSA(appId, data) },
+            { error -> println(error) }
+        )
+    }
 
-    val feed = session.newsFeed.blockingCreate(feedPost)
-
-    assert(feed?.payload?.get("pronostics") != null)
 }
 
-val data = """
-{
-      "userID": "370",
-      "id": "52480",
-      "uniqueTip": "52471",
-      "parentID": "52471",
-      "datetime": "2018-11-27 16:50:27",
-      "sport": "football",
-      "competition": "League Cup",
-      "gameID": "2888323",
-      "homeTeamID": "6394",
-      "homeTeam": "Nimes",
-      "awayTeamID": "9853",
-      "awayTeam": "Saint-Etienne",
-      "gameTime": "19:00",
-      "comment": "",
-      "PriorityComment": "0",
-      "result": "Nimes-Saint-Etienne<br>Vainqueur (Temps r\u00e9glementaire) : Saint-Etienne",
-      "cote": "2.53",
-      "tipTotalBet": "289.35",
-      "mise": "4.50",
-      "type": "bet",
-      "status": "En cours",
-      "totalResult": "en cours",
-      "outcomeID": "483607721",
-      "outcome": "Vainqueur (Temps r\u00e9glementaire) : Saint-Etienne",
-      "tipLikes": "0",
-      "tipComments": "0",
-      "isLiked": false,
-      "totalCombine": "4",
-      "startdate": "2018-11-27 19:00:00",
-      "followed": "1",
-      "homeCountryID": "5",
-      "awayCountryID": "5",
-      "LEASTVALUE": "215",
-      "likes": 0,
-      "comments": 0,
-      "ismulti": true,
-      "match": {
-        "title": "",
-        "gameID": 2888323,
-        "extra_title": "",
-        "meteo": "",
-        "status": "",
-        "time": "19:00",
-        "has_summary": false,
-        "teamA": {
-          "name": "Nimes",
-          "shortname": ""
-        },
-        "teamB": {
-          "name": "Saint-Etienne",
-          "shortname": ""
+fun sendDataToMSA(appId: String, data: Data) {
+    data.items?.forEach { payload ->
+
+        val message = if (payload["comment"]?.toString()?.isBlank() == false) {
+            payload["comment"].toString()
+        } else {
+            "ceci est un message par défaut"
         }
-      },
-      "pronostics": [
-        {
-          "uid": null,
-          "subtitle": "FC Boca Juniors vs Gibraltar United FC",
-          "outcome": "Vainqueur (Temps r\u00e9glementaire) : FC Boca Juniors",
-          "bet": "Cote 8.36",
-          "time": "19:00",
-          "comment": "",
-          "teamA": {
-            "logo": "\/images\/logos\/default.png",
-            "name": "FC Boca Juniors",
-            "shortname": ""
-          },
-          "teamB": {
-            "name": "Gibraltar United FC",
-            "shortname": ""
-          }
-        },
-        {
-          "uid": null,
-          "subtitle": "Nimes vs Saint-Etienne",
-          "outcome": "Vainqueur (Temps r\u00e9glementaire) : Saint-Etienne",
-          "bet": "Cote 2.53",
-          "time": "19:00",
-          "comment": "",
-          "teamA": {
-            "name": "Nimes",
-            "shortname": ""
-          },
-          "teamB": {
-            "name": "Saint-Etienne",
-            "shortname": ""
-          }
-        },
-        {
-          "uid": null,
-          "subtitle": "Ramsbottom United vs Pickering Town",
-          "outcome": "Vainqueur (Temps r\u00e9glementaire) : Pickering Town",
-          "bet": "Cote 4.50",
-          "time": "19:00",
-          "comment": "",
-          "teamA": {
-            "name": "Ramsbottom United",
-            "shortname": ""
-          },
-          "teamB": {
-            "name": "Pickering Town",
-            "shortname": ""
-          }
-        },
-        {
-          "uid": null,
-          "subtitle": "Ipswich Town vs Bristol City",
-          "outcome": "Vainqueur (Temps r\u00e9glementaire) : Ipswich Town",
-          "bet": "Cote 3.04",
-          "time": "19:00",
-          "comment": "",
-          "teamA": {
-            "name": "Ipswich Town",
-            "shortname": ""
-          },
-          "teamB": {
-            "name": "Bristol City",
-            "shortname": ""
-          }
-        }
-      ],
-      "pronostic_summary": {
-        "uid": "52480",
-        "title": "4 matchs",
-        "bet": "289.35 - 4.50"
-      }
+
+        val feedPost = FeedPost.Builder()
+            .setMessage(message)
+            .setPayload(payload)
+            .setVisibility(AccessControl.PUBLIC)
+            .build()
+
+
+        val session = getUserSessionFromMSA(appId, payload) // get MSA user session
+        session.newsFeed.blockingCreate(feedPost)
+
     }
-""".trimIndent()
+}
+
+fun getUserSessionFromMSA(appId: String, payload: Map<String, Any?>): Session {
+    val userId = payload["userID"].toString()
+    val email = "$userId@tipstop.co"
+    val password = email.toHash()
+
+    val msa = MySocialApp.Builder().setAppId(appId).build()
+
+    return try {
+        // get user session
+        msa.blockingConnect(email, password)
+
+    } catch (e: Exception) {
+
+        // account does not exists in MySocialApp, create it!
+        val userName = (payload["user"] as? Map<*, *>)?.get("name")?.toString() ?: email
+        val session = msa.blockingCreateAccount(email, password, userName)
+
+        val account = session.account.blockingGet().copy(
+            externalId = userId, // attach Tipstop User ID to the MSA User external ID
+            userSettings = UserSettings( // set user settings to French for notification messages
+                languageZone = UserSettings.LanguageZone.FR,
+                interfaceLanguage = UserSettings.InterfaceLanguage.FR
+            )
+        ).also { it.session = session } // copy does not deep copy and include session
+
+        account.blockingSave()
+
+        session
+    }
+}
+
+suspend fun getTipsTopData(token: String, phpSessionId: String, page: Int = 1): Result<Data, FuelError> {
+    val apiUrl = "https://prp.tipstop.co/data/feeds/1/1?page=$page"
+
+    val (_, _, result) = Fuel.get(apiUrl).header(
+        "Authorization" to "Basic $token",
+        "Cookie" to "PHPSESSID=$phpSessionId; use_cookie=true",
+        "DNT" to "1"
+    ).awaitObjectResponse(jacksonDeserializerOf<Data>())
+
+    return result
+}
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class Data(val items: List<Map<String, Any?>>? = null)
